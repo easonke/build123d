@@ -208,7 +208,7 @@ class RevoluteJoint(Joint):
 
     Attributes:
         angle (float): angle of joint
-        angle_reference (Vector): reference for angular positions
+        angle_initial (float): initial angle
         angular_range (tuple[float,float]): min and max angular position of joint
         relative_axis (Axis): joint axis relative to bound part
 
@@ -248,9 +248,10 @@ class RevoluteJoint(Joint):
         if angle_reference:
             if not axis.is_normal(Axis((0, 0, 0), angle_reference)):
                 raise ValueError("angle_reference must be normal to axis")
-            self.angle_reference = Vector(angle_reference)
+            default_x_dir = Plane(origin=(0, 0, 0), z_dir=axis.direction).x_dir
+            self.angle_initial = default_x_dir.get_signed_angle(Vector(angle_reference), axis.direction)
         else:
-            self.angle_reference = Plane(origin=(0, 0, 0), z_dir=axis.direction).x_dir
+            self.angle_initial = 0
         self._angle = None
         self.relative_axis = axis.located(to_part.location.inverse())
         to_part.joints[label] = self
@@ -289,17 +290,15 @@ class RevoluteJoint(Joint):
         if angle < self.angular_range[0] or angle > self.angular_range[1]:
             raise ValueError(f"angle ({angle}) must in range of {self.angular_range}")
         self._angle = angle
-        # Avoid strange rotations when angle is zero by using 360 instead
-        angle = 360.0 if angle == 0.0 else angle
+        
+        
         rotation = Location(
-            Plane(
-                origin=(0, 0, 0),
-                x_dir=self.angle_reference.rotate(self.relative_axis, angle),
-                z_dir=self.relative_axis.direction,
-            )
+            self.relative_axis.position,
+            self.relative_axis.direction,
+            angle + self.angle_initial
         )
         return (
-            self.relative_axis.location * rotation * other.relative_location.inverse()
+            rotation * other.relative_location.inverse()
         )
 
 
